@@ -38,11 +38,13 @@ pkg_check_modules(GST REQUIRED gstreamer-1.0>=1.4
         gstreamer-video-1.0>=1.4
         gstreamer-app-1.0>=1.4
         gstreamer-rtsp-server-1.0>=1.4)
+pkg_check_modules(GLIB REQUIRED glib-2.0>=2.23)
 
 include_directories(
 ${OPENCV_INCLUDE_DIR}
 ${realsense2_INCLUDE_DIRS}
 ${GST_INCLUDE_DIRS}
+${GLIB_INCLUDE_DIRS}
 )
 
 add_executable(RGBDStreaming RGBDstreaming.cpp)
@@ -50,6 +52,16 @@ target_link_libraries(RGBDStreaming
         ${OpenCV_LIBS}
         ${realsense2_LIBRARIES}
         ${GST_LIBRARIES}
+        realsense2
+        )
+
+
+add_executable(RGBD_rtsp_streaming RGBD_rtsp_streaming.cpp)
+target_link_libraries(RGBD_rtsp_streaming
+        ${OpenCV_LIBS}
+        ${realsense2_LIBRARIES}
+        ${GST_LIBRARIES}
+        ${GLIB_LDFLAGS}
         realsense2
         )
 
