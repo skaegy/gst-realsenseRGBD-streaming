@@ -34,7 +34,7 @@ const int WIDTH = 640;
 const int HEIGHT = 480;
 const int SIZE = 640 * 480 * 3;
 const int FRAME = 15;
-
+rs2::align align(RS2_STREAM_COLOR);
 
 typedef struct
 {
@@ -47,24 +47,60 @@ static void
 need_data (GstElement * appsrc, guint unused, gpointer user_data)
 {
     GstBuffer *buffer;
-    guint size = WIDTH * HEIGHT * 3;
+    guint size = WIDTH * HEIGHT * 3 * 2;
     GstFlowReturn ret;
     rs2::pipeline* pPipe = (rs2::pipeline* ) user_data;
 
     rs2::frameset rs_d415 = pPipe->wait_for_frames();
-    //rs2::frameset aligned_frame = align.process(rs_d415);
-    rs2::frame depth = rs_d415.get_depth_frame();
-    rs2::frame color = rs_d415.get_color_frame();
+    rs2::frameset aligned_frame = align.process(rs_d415);
+    rs2::frame depth = aligned_frame.get_depth_frame();
+    rs2::frame color = aligned_frame.get_color_frame();
 
     cv::Mat imRGB(cv::Size(WIDTH, HEIGHT), CV_8UC3, (void *) color.get_data(), cv::Mat::AUTO_STEP);
-    cv::Mat imDep(cv::Size(WIDTH, HEIGHT), CV_16UC1, (void *) color.get_data(), cv::Mat::AUTO_STEP);
-    cv::Mat imOut = imRGB.clone();
+    cv::Mat imDep(cv::Size(WIDTH, HEIGHT), CV_16UC1, (void *) depth.get_data(), cv::Mat::AUTO_STEP);
+
+    /* encode depth (Z_16) to CV_8UC3
+     * Decode:
+     * if (imOut(1) >= imOut(0))  dist = imOut(0)*20 + imOut(2)
+     * if (imOut(1) < imOut(0))   dist = imOut(0)*19 + imOut(1)
+     * */
+    double scale_factor = 0.05;
+    std::vector<cv::Mat> Depth_channel(3);
+    imDep.convertTo(Depth_channel[0], CV_16U, scale_factor);
+    imDep.copyTo(Depth_channel[1]);
+    Depth_channel[1] = Depth_channel[1] - Depth_channel[0]*(1/scale_factor - 1);
+    imDep.copyTo(Depth_channel[2]);
+    Depth_channel[2] = Depth_channel[2] - Depth_channel[0]*(1/scale_factor);
+
+    cv::Mat imD_C3, imCombine;
+    cv::merge(Depth_channel, imD_C3);
+    imD_C3.convertTo(imD_C3, CV_8UC3);
+
+    cv::vconcat(imRGB,imD_C3,imCombine);
+
+    /*
+    cv::Vec3b mapData = imD_C3.at<cv::Vec3b>(100,100);
+    int dist;
+    if (mapData(1) >= mapData(0) )
+        dist = (int)mapData(0)*20 + (int)mapData(2);
+    if (mapData(1) < mapData(0))
+        dist = (int)mapData(0)*19 + (int)mapData(1);
+
+    std::cout << "16BIT: " << imDep.at<ushort>(100,100)
+              << " Decode: " << dist
+              << " Diff: " << imDep.at<ushort>(100,100) - dist
+              << " " << (cv::Vec3f)mapData
+              << std::endl;
+              */
 
     GstMapInfo mapinfo;
     buffer = gst_buffer_new_allocate (NULL, size, NULL);
     gst_buffer_map (buffer, &mapinfo, GST_MAP_WRITE);
-    memcpy(mapinfo.data, imOut.data,  gst_buffer_get_size( buffer ) );
-    //buffer = gst_buffer_new_wrapped_full( (GstMemoryFlags)0, (void *)imRGB.data, SIZE, 0, SIZE, NULL, NULL );
+    // Connect address of Mat and Buffer !!!!
+    memcpy(mapinfo.data, imCombine.data,  gst_buffer_get_size( buffer ) );
+
+    // gst_buffer_new_wrapped_full: have error when direct use imOut
+    //buffer = gst_buffer_new_wrapped_full( (GstMemoryFlags)0, (void *)imD_C3.data, size, 0, size, NULL, NULL );
 
     g_signal_emit_by_name (appsrc, "push-buffer", buffer, &ret);
 }
@@ -92,7 +128,7 @@ media_configure (GstRTSPMediaFactory * factory, GstRTSPMedia * media,
                   gst_caps_new_simple ("video/x-raw",
                                        "format", G_TYPE_STRING, "RGB",
                                        "width", G_TYPE_INT, WIDTH,
-                                       "height", G_TYPE_INT, HEIGHT,
+                                       "height", G_TYPE_INT, HEIGHT*2,
                                        "framerate", GST_TYPE_FRACTION, FRAME, 1, NULL), NULL);
 
     /* install the callback that will be called when a buffer is needed */
@@ -113,7 +149,6 @@ main (int argc, char *argv[])
 
     /* Initialize realsense d415*/
     rs2::pipeline rs_pipe;
-    rs2::align align(RS2_STREAM_COLOR);
     rs2::config rs_cfg;
     rs_cfg.enable_stream(RS2_STREAM_DEPTH, WIDTH, HEIGHT, RS2_FORMAT_Z16, FRAME);
     rs_cfg.enable_stream(RS2_STREAM_COLOR, WIDTH, HEIGHT, RS2_FORMAT_RGB8, FRAME);
