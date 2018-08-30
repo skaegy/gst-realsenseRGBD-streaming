@@ -19,103 +19,6 @@
  * License along with this library; if not, write to the
  * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
  * Boston, MA 02110-1301, USA.
- *
- * from threading import Thread
-from time import clock
-
-import cv2
-import gi
-
-gi.require_version('Gst', '1.0')
-gi.require_version('GstRtspServer', '1.0')
-from gi.repository import Gst, GstRtspServer, GObject
-
-
-class SensorFactory(GstRtspServer.RTSPMediaFactory):
-    def __init__(self, **properties):
-        super(SensorFactory, self).__init__(**properties)
-        self.launch_string = 'appsrc ! video/x-raw,width=320,height=240,framerate=30/1 ' \
-                             '! videoconvert ! x264enc speed-preset=ultrafast tune=zerolatency ' \
-                             '! rtph264pay config-interval=1 name=pay0 pt=96'
-        self.pipeline = Gst.parse_launch(self.launch_string)
-        self.appsrc = self.pipeline.get_child_by_index(4)
-
-    def do_create_element(self, url):
-        return self.pipeline
-
-
-class GstServer(GstRtspServer.RTSPServer):
-    def __init__(self, **properties):
-        super(GstServer, self).__init__(**properties)
-        self.factory = SensorFactory()
-        self.factory.set_shared(True)
-        self.get_mount_points().add_factory("/test", self.factory)
-        self.attach(None)
-
-
-GObject.threads_init()
-Gst.init(None)
-
-server = GstServer()
-
-loop = GObject.MainLoop()
-th = Thread(target=loop.run)
-th.start()
-
-print('Thread started')
-
-cap = cv2.VideoCapture(0)
-
-print(cap.isOpened())
-
-frame_number = 0
-
-fps = 30
-duration = 1 / fps
-
-timestamp = clock()
-
-while cap.isOpened():
-    ret, frame = cap.read()
-    if ret:
-
-        print('Writing buffer')
-
-        data = frame.tostring()
-
-        buf = Gst.Buffer.new_allocate(None, len(data), None)
-        buf.fill(0, data)
-        buf.duration = fps
-        timestamp = clock() - timestamp
-        buf.pts = buf.dts = int(timestamp)
-        buf.offset = frame_number
-        frame_number += 1
-        retval = server.factory.appsrc.emit('push-buffer', buf)
-        print(retval)
-
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
-
-cap.release()
- */
-
-/* GStreamer
- * Copyright (C) 2008 Wim Taymans <wim.taymans at gmail.com>
- *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Library General Public
- * License as published by the Free Software Foundation; either
- * version 2 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Library General Public License for more details.
- *
- * You should have received a copy of the GNU Library General Public
- * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
- * Boston, MA 02110-1301, USA.
  */
 
 #include <gst/gst.h>
@@ -144,31 +47,24 @@ static void
 need_data (GstElement * appsrc, guint unused, gpointer user_data)
 {
     GstBuffer *buffer;
-    guint size;
+    guint size = WIDTH * HEIGHT * 3;
     GstFlowReturn ret;
     rs2::pipeline* pPipe = (rs2::pipeline* ) user_data;
 
-    std::cout << 1 << std::endl;
-
-    //buffer = gst_buffer_new_allocate (NULL, SIZE, NULL);
-
     rs2::frameset rs_d415 = pPipe->wait_for_frames();
     //rs2::frameset aligned_frame = align.process(rs_d415);
-    //rs2::frame depth = aligned_frame.get_depth_frame();
+    rs2::frame depth = rs_d415.get_depth_frame();
     rs2::frame color = rs_d415.get_color_frame();
 
-    buffer = gst_buffer_new_wrapped_full( ( GstMemoryFlags )0, (void *)color.get_data(), SIZE, 0, SIZE, NULL, NULL );
-    /*
+    cv::Mat imRGB(cv::Size(WIDTH, HEIGHT), CV_8UC3, (void *) color.get_data(), cv::Mat::AUTO_STEP);
+    cv::Mat imDep(cv::Size(WIDTH, HEIGHT), CV_16UC1, (void *) color.get_data(), cv::Mat::AUTO_STEP);
+    cv::Mat imOut = imRGB.clone();
 
-    gst_buffer_memset (buffer, 0, ctx->white ? 0xff : 0x0, size);
-
-    ctx->white = !ctx->white;
-
-
-    GST_BUFFER_PTS (buffer) = ctx->timestamp;
-    GST_BUFFER_DURATION (buffer) = gst_util_uint64_scale_int (1, GST_SECOND, 2);
-    ctx->timestamp += GST_BUFFER_DURATION (buffer);
-    */
+    GstMapInfo mapinfo;
+    buffer = gst_buffer_new_allocate (NULL, size, NULL);
+    gst_buffer_map (buffer, &mapinfo, GST_MAP_WRITE);
+    memcpy(mapinfo.data, imOut.data,  gst_buffer_get_size( buffer ) );
+    //buffer = gst_buffer_new_wrapped_full( (GstMemoryFlags)0, (void *)imRGB.data, SIZE, 0, SIZE, NULL, NULL );
 
     g_signal_emit_by_name (appsrc, "push-buffer", buffer, &ret);
 }
@@ -197,14 +93,7 @@ media_configure (GstRTSPMediaFactory * factory, GstRTSPMedia * media,
                                        "format", G_TYPE_STRING, "RGB",
                                        "width", G_TYPE_INT, WIDTH,
                                        "height", G_TYPE_INT, HEIGHT,
-                                       "framerate", GST_TYPE_FRACTION, 15, 1, NULL), NULL);
-    /*
-    ctx = g_new0 (MyContext, 1);
-    ctx->white = FALSE;
-    ctx->timestamp = 0;
-    g_object_set_data_full (G_OBJECT (media), "my-extra-data", ctx,
-                            (GDestroyNotify) g_free);
-    */
+                                       "framerate", GST_TYPE_FRACTION, FRAME, 1, NULL), NULL);
 
     /* install the callback that will be called when a buffer is needed */
     g_signal_connect (appsrc, "need-data", (GCallback) need_data, pPipe);
@@ -247,8 +136,8 @@ main (int argc, char *argv[])
      * element with pay%d names will be a stream */
     factory = gst_rtsp_media_factory_new ();
     gst_rtsp_media_factory_set_launch (factory,
-                                       "( appsrc name=mysrc ! videoconvert ! x264enc pass=qual quantizer=20 tune=zerolatency"
-                                       " ! rtph264pay name=pay0 pt=96 )");
+                                       "( appsrc name=mysrc !  videoconvert ! "
+                                       "x264enc pass=qual quantizer=20 tune=zerolatency ! rtph264pay name=pay0 pt=96 )");
 
     /* notify when our media is ready, This is called whenever someone asks for
      * the media and a new pipeline with our appsrc is created */
