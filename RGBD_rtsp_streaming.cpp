@@ -30,9 +30,9 @@
 #include <opencv2/imgproc.hpp>
 #include <iostream>
 
-const int WIDTH = 640;
-const int HEIGHT = 480;
-const int SIZE = 640 * 480 * 3;
+const int WIDTH = 424;
+const int HEIGHT = 240;
+const int SIZE = WIDTH * HEIGHT * 3;
 const int FRAME = 15;
 rs2::align align(RS2_STREAM_COLOR);
 
@@ -64,6 +64,7 @@ need_data (GstElement * appsrc, guint unused, gpointer user_data)
      * if (imOut(1) >= imOut(0))  dist = imOut(0)*20 + imOut(2)
      * if (imOut(1) < imOut(0))   dist = imOut(0)*19 + imOut(1)
      * */
+
     double scale_factor = 0.05;
     std::vector<cv::Mat> Depth_channel(3);
     imDep.convertTo(Depth_channel[0], CV_16U, scale_factor);
@@ -112,7 +113,6 @@ media_configure (GstRTSPMediaFactory * factory, GstRTSPMedia * media,
                  gpointer user_data)
 {
     GstElement *element, *appsrc;
-    MyContext *ctx;
     rs2::pipeline* pPipe = (rs2::pipeline* ) user_data;
 
     /* get the element used for providing the streams of the media */
