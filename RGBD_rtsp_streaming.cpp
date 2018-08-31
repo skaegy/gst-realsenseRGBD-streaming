@@ -47,7 +47,7 @@ static void
 need_data (GstElement * appsrc, guint unused, gpointer user_data)
 {
     GstBuffer *buffer;
-    guint size = WIDTH * HEIGHT * 3 * 2;
+    guint size = SIZE * 2;
     GstFlowReturn ret;
     rs2::pipeline* pPipe = (rs2::pipeline* ) user_data;
 
@@ -73,7 +73,8 @@ need_data (GstElement * appsrc, guint unused, gpointer user_data)
     imDep.copyTo(Depth_channel[2]);
     Depth_channel[2] = Depth_channel[2] - Depth_channel[0]*(1/scale_factor);
 
-    cv::Mat imD_C3, imCombine;
+    cv::Mat imD_C3;
+    cv::Mat imCombine(cv::Size(WIDTH, HEIGHT*2), CV_8UC3);
     cv::merge(Depth_channel, imD_C3);
     imD_C3.convertTo(imD_C3, CV_8UC3);
 

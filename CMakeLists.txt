@@ -33,7 +33,8 @@ find_package(OpenCV REQUIRED)
 find_package(realsense2 REQUIRED)
 find_package(PkgConfig)
 
-pkg_check_modules(GST REQUIRED gstreamer-1.0>=1.4
+pkg_check_modules(GST REQUIRED
+        gstreamer-1.0>=1.4
         gstreamer-sdp-1.0>=1.4
         gstreamer-video-1.0>=1.4
         gstreamer-app-1.0>=1.4
@@ -46,6 +47,8 @@ ${realsense2_INCLUDE_DIRS}
 ${GST_INCLUDE_DIRS}
 ${GLIB_INCLUDE_DIRS}
 )
+message(STATUS ${GST_LIBRARIES})
+message(STATUS ${GST_INCLUDE_DIRS})
 
 add_executable(RGBDStreaming RGBDstreaming.cpp)
 target_link_libraries(RGBDStreaming
@@ -66,5 +69,9 @@ target_link_libraries(RGBD_rtsp_streaming
         )
 
 add_executable(UDPserver UDPserver.cpp)
+target_link_libraries(UDPserver
+        ${OpenCV_LIBS})
 
 add_executable(UDPlistener UDPlistener.cpp)
+target_link_libraries(UDPlistener
+        ${OpenCV_LIBS})

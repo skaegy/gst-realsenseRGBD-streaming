@@ -1,0 +1,19 @@
+%YAML:1.0
+
+#-------------------------------------
+# The Settings of RTSP & UDP listener
+#-------------------------------------
+
+#----------- RTSP server ------------#
+Image_width: 424
+Image_height: 240
+In_frame: 15
+
+#------- UDP server & listener ------#
+Send_inverval: 1000    # millisecond
+Receiver_interval: 200 # millisecond
+Buf_size: 128
+Port_in: 8888
+Port_out: 8889
+IP_addr_listen: "127.0.0.1"
+timeout_max: 10

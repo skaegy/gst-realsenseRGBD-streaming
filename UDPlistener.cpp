@@ -2,32 +2,46 @@
 // Created by root on 27/08/18.
 //
 
-#include<sys/select.h>
-#include<unistd.h>
-#include<sys/types.h>
-#include<sys/socket.h>
-#include<arpa/inet.h>
-#include<netinet/in.h>
+#include <sys/select.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
 #include <cstdlib>
 #include <cstdio>
 #include <cstring>
 #include <iostream>
+#include <opencv2/core.hpp>
+#include <opencv2/opencv.hpp>
 
 int main(){
+    //========= Load parameters ==========//
+    const std::string &strSetting = "../settings.yaml";
+    cv::FileStorage fs(strSetting, cv::FileStorage::READ);
+    if(!fs.isOpened())
+    {
+        std::cerr << "Failed to open setting file! Exit!" << std::endl;
+        exit(-1);
+    }
 
-    //同一台电脑测试，需要两个端口
-    int port_in  = 8888;
-    int port_out = 8889;
+    const int port_in = fs["Port_in"];
+    const int port_out = fs["Port_out"];
+    const int receiver_interval = fs["Receiver_interval"];
+    const int buf_size = fs["Buf_size"];
+    const std::string server_addr= fs["IP_addr_listen"];
+    const int timeout_max = fs["timeout_max"];
+
+
+    //========== create socket ===========//
     int sockfd;
-
-    // 创建socket
     sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     if(-1==sockfd){
         return false;
         puts("Failed to create socket");
     }
 
-    // 设置地址与端口
+    // ========= set address and port =========//
     struct sockaddr_in addr;
     socklen_t          addr_len=sizeof(addr);
 
@@ -35,41 +49,47 @@ int main(){
     addr.sin_family = AF_INET;       // Use IPV4
     addr.sin_port   = htons(port_out);    //
     //addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    addr.sin_addr.s_addr = inet_addr("127.0.0.1"); // IP address of server
+    const char* serveraddr = server_addr.c_str();
+    addr.sin_addr.s_addr = inet_addr(serveraddr); // IP address of server
 
-    // Time out
+    // ========= set listen interval =========== //
     struct timeval tv;
     tv.tv_sec  = 0;
-    tv.tv_usec = 200000;  // 200 ms
+    tv.tv_usec = receiver_interval*1000;  // millisecond to usecond
     setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof(struct timeval));
 
-    // Bind 端口，用来接受之前设定的地址与端口发来的信息,作为接受一方必须bind端口，并且端口号与发送方一致
+    //========== Bind ports. ===========//
+    // The receiver must bind port, the ports no. of server and listener should be the same.
     if (bind(sockfd, (struct sockaddr*)&addr, addr_len) == -1){
         printf("Failed to bind socket on port %d\n", port_out);
         close(sockfd);
         return false;
     }
 
-    char buffer[128];
-    memset(buffer, 0, 128);
-
-    int counter = 0;
+    char buffer[buf_size];
+    memset(buffer, 0, buf_size);
+    int counter = 0, timeout_cnt = 0;
+    //=========== listen to addr and port =============//
     while(1){
         struct sockaddr_in src;
         socklen_t src_len = sizeof(src);
         memset(&src, 0, sizeof(src));
 
-        int sz = recvfrom(sockfd, buffer, 128, 0, (sockaddr*)&src, &src_len);
+        int sz = recvfrom(sockfd, buffer, buf_size, 0, (sockaddr*)&src, &src_len);
         if (sz > 0){
             buffer[sz] = 0;
             printf("Get Message %d: %s\n", counter++, buffer);
+            timeout_cnt = 0;
         }
         else{
-            puts("timeout");
-            //break;
+            timeout_cnt++;
+            printf("No data: %d\n", timeout_cnt);
+            if (timeout_cnt > timeout_max)
+                break;
         }
     }
 
+    printf("No data is received from: %s:%d \n", serveraddr, port_out);
     close(sockfd);
     return 0;
 }
