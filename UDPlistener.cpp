@@ -29,7 +29,7 @@ int main(){
     const int port_out = fs["Port_out"];
     const int receiver_interval = fs["Receiver_interval"];
     const int buf_size = fs["Buf_size"];
-    const std::string server_addr= fs["IP_addr_listen"];
+    //const std::string server_addr= fs["IP_addr_listen"];
     const int timeout_max = fs["timeout_max"];
 
 
@@ -49,7 +49,7 @@ int main(){
     addr.sin_family = AF_INET;       // Use IPV4
     addr.sin_port   = htons(port_out);    //
     addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    const char* serveraddr = server_addr.c_str();
+    //const char* serveraddr = server_addr.c_str();
     //addr.sin_addr.s_addr = inet_addr(serveraddr); // IP address of server
 
     // ========= set listen interval =========== //
@@ -89,7 +89,7 @@ int main(){
         }
     }
 
-    printf("No data is received from: %s:%d \n", serveraddr, port_out);
+    printf("No data is received from port:%d \n", port_out);
     close(sockfd);
     return 0;
 }
