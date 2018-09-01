@@ -13,7 +13,7 @@ In_frame: 15
 Send_inverval: 1000    # millisecond
 Receiver_interval: 200 # millisecond
 Buf_size: 128
-Port_in: 8888
+Port_in: 8889
 Port_out: 8889
-IP_addr_listen: "127.0.0.1"
+IP_addr_listen: "155.198.210.231"
 timeout_max: 10

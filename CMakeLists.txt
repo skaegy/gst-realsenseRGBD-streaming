@@ -1,5 +1,5 @@
-cmake_minimum_required(VERSION 3.12)
-project(RGBDStreaming)
+cmake_minimum_required(VERSION 3.5)
+project(NetworkProtocolTest)
 
 set(CMAKE_CXX_STANDARD 11)
 
@@ -32,7 +32,10 @@ set(OpenCV_DIR /opt/ros/kinetic/share/OpenCV-3.3.1-dev) # LINK TO OPENCV IN ROS
 find_package(OpenCV REQUIRED)
 find_package(realsense2 REQUIRED)
 find_package(PkgConfig)
-
+find_package(Boost  1.54.0  	     # Minimum or EXACT version e.g. 1.36.0
+        REQUIRED             					# Fail with error if Boost is not found
+        COMPONENTS serialization 				# Boost libraries by their canonical name
+        )
 pkg_check_modules(GST REQUIRED
         gstreamer-1.0>=1.4
         gstreamer-sdp-1.0>=1.4
@@ -42,13 +45,16 @@ pkg_check_modules(GST REQUIRED
 pkg_check_modules(GLIB REQUIRED glib-2.0>=2.23)
 
 include_directories(
+${PROJECT_SOURCE_DIR}
 ${OPENCV_INCLUDE_DIR}
 ${realsense2_INCLUDE_DIRS}
 ${GST_INCLUDE_DIRS}
 ${GLIB_INCLUDE_DIRS}
 )
-message(STATUS ${GST_LIBRARIES})
-message(STATUS ${GST_INCLUDE_DIRS})
+
+add_library(${PROJECT_NAME} SHARED
+udpSocketSimple.h
+udpSocketSimple.cpp)
 
 add_executable(RGBDStreaming RGBDstreaming.cpp)
 target_link_libraries(RGBDStreaming
@@ -57,7 +63,6 @@ target_link_libraries(RGBDStreaming
         ${GST_LIBRARIES}
         realsense2
         )
-
 
 add_executable(RGBD_rtsp_streaming RGBD_rtsp_streaming.cpp)
 target_link_libraries(RGBD_rtsp_streaming
@@ -75,3 +80,10 @@ target_link_libraries(UDPserver
 add_executable(UDPlistener UDPlistener.cpp)
 target_link_libraries(UDPlistener
         ${OpenCV_LIBS})
+
+add_executable(udpSocketTest udpSocketTest.cpp)
+target_link_libraries(udpSocketTest
+        ${PROJECT_NAME}
+        ${OpenCV_LIBS}
+        ${Boost_LIBRARIES}
+        pthread)

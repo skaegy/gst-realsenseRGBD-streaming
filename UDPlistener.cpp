@@ -37,8 +37,8 @@ int main(){
     int sockfd;
     sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     if(-1==sockfd){
-        return false;
         puts("Failed to create socket");
+        return false;
     }
 
     // ========= set address and port =========//
@@ -48,9 +48,9 @@ int main(){
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;       // Use IPV4
     addr.sin_port   = htons(port_out);    //
-    //addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    addr.sin_addr.s_addr = htonl(INADDR_ANY);
     const char* serveraddr = server_addr.c_str();
-    addr.sin_addr.s_addr = inet_addr(serveraddr); // IP address of server
+    //addr.sin_addr.s_addr = inet_addr(serveraddr); // IP address of server
 
     // ========= set listen interval =========== //
     struct timeval tv;
