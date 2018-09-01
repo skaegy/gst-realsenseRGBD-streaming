@@ -27,22 +27,20 @@ udpSocket::udpSocket(const string strSettingFile)
     mSenderInterval = fs["Send_inverval"];
     mReceiverInterval = fs["Receiver_interval"];
     const string server_addr = fs["IP_addr_listen"];
-    mIPListenToServer = server_addr.c_str();
+    mClientIP = server_addr.c_str();
     mTimeOutMax = fs["timeout_max"];
 
-    CreateServerSocket(mPortIn);
-    CreateClientSocket(mPortOut, mReceiverInterval);
+    CreateServerSocket();
+    CreateClientSocket();
 
 }
 
-void udpSocket::RunServer(){
+void udpSocket::RunServer()
+{
     int counter = 0;
-
+    socklen_t  addr_len=sizeof(addrServer);
     while(1){
-        socklen_t addr_len=sizeof(addrServer);
-        addrServer.sin_family = AF_INET;
-        addrServer.sin_port   = htons(mPortOut);
-        addrServer.sin_addr.s_addr = htonl(INADDR_ANY);
+
         std::string send_str = "Hello world " + std::to_string(counter);
 
         sendto(mSockfdServer, send_str.c_str(), send_str.length(), 0, (sockaddr*)&addrServer, addr_len);
@@ -56,7 +54,8 @@ void udpSocket::RunServer(){
     close(mSockfdServer);
 }
 
-void udpSocket::Run() {
+void udpSocket::RunClient()
+{
     int counter = 0, timeout_cnt = 0;
 
     while(1){
@@ -82,11 +81,11 @@ void udpSocket::Run() {
             break;
         }
     }
-    printf("No data is received from: %s:%d \n", mIPListenToServer, mPortOut);
+    printf("No data is received from port: %d \n", mPortOut);
     close(mSockfdClient);
 }
 
-bool udpSocket::CreateServerSocket(int port_in){
+bool udpSocket::CreateServerSocket(){
     // create socket
     mSockfdServer = socket(AF_INET, SOCK_DGRAM, 0);
     if (mSockfdServer == -1){
@@ -95,22 +94,17 @@ bool udpSocket::CreateServerSocket(int port_in){
     }
     // Set IP address and port
     socklen_t  addr_len=sizeof(addrServer);
-
     memset(&addrServer, 0, sizeof(addrServer));
-    addrServer.sin_family = AF_INET;       // Use IPV4
-    addrServer.sin_port   = htons(port_in);    //
-    addrServer.sin_addr.s_addr = htonl(INADDR_ANY);
 
-    if (bind(mSockfdServer, (struct sockaddr*)&addrServer, addr_len) == -1){
-        printf("Server: Failed to bind socket on port %d\n", port_in);
-        close(mSockfdServer);
-        return false;
-    }
+    addrServer.sin_family = AF_INET;
+    addrServer.sin_port   = htons(mPortOut);
+    addrServer.sin_addr.s_addr = inet_addr(mClientIP);
 
-    return 0;
+    puts("Server is established!");
+    return true;
 }
 
-bool udpSocket::CreateClientSocket(int port_out, int receiver_interval){
+bool udpSocket::CreateClientSocket(){
     // create socket
     mSockfdClient = socket(AF_INET, SOCK_DGRAM, 0);
     if(-1==mSockfdClient){
@@ -122,23 +116,26 @@ bool udpSocket::CreateClientSocket(int port_out, int receiver_interval){
 
     memset(&addrClient, 0, sizeof(addrClient));
     addrClient.sin_family = AF_INET;          // Use IPV4
-    addrClient.sin_port   = htons(port_out);
-    addrClient.sin_addr.s_addr = inet_addr(mIPListenToServer); // IP address of server
+    addrClient.sin_port   = htons(mPortOut);
+    addrClient.sin_addr.s_addr = htonl(INADDR_ANY);
+
     // set listen interval
     struct timeval tv;
     tv.tv_sec  = 0;
-    tv.tv_usec = receiver_interval*1000;  // millisecond to usecond
+    tv.tv_usec = mReceiverInterval*1000;  // millisecond to usecond
     setsockopt(mSockfdClient, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof(struct timeval));
+
     // bind ports
     if (bind(mSockfdClient, (struct sockaddr*)&addrClient, addr_len) == -1){
-        printf("Client: Failed to bind socket on port %d\n", port_out);
+        printf("Client: Failed to bind socket on port %d\n", mPortOut);
         close(mSockfdClient);
         return false;
     }
     // set buffer
     memset(mbuffer, 0, mBuffersize);
 
-    return false;
+    puts("Client is listening!");
+    return true;
 }
 
 }

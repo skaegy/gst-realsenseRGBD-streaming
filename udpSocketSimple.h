@@ -31,11 +31,11 @@ public:
 
     void RunServer();
 
-    void Run();
+    void RunClient();
 
-    bool CreateServerSocket(int port_in);
+    bool CreateServerSocket();
 
-    bool CreateClientSocket(int port_out, int receiver_interval);
+    bool CreateClientSocket();
 
     bool mCloseServer = false;
 
@@ -48,7 +48,7 @@ private:
 
     int mPortIn, mPortOut;
     int mReceiverInterval, mSenderInterval;
-    const char* mIPListenToServer;
+    const char* mClientIP;
     int mTimeOutMax;
 
     int mSockfdServer, mSockfdClient;
