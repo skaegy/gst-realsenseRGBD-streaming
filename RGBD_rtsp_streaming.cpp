@@ -53,47 +53,46 @@ need_data (GstElement * appsrc, guint unused, gpointer user_data)
 
     rs2::frameset rs_d415 = pPipe->wait_for_frames();
     rs2::frameset aligned_frame = align.process(rs_d415);
+
+    rs2::spatial_filter spat_filter;    //
+    spat_filter.set_option(RS2_OPTION_FILTER_MAGNITUDE, 2);
+    spat_filter.set_option(RS2_OPTION_FILTER_SMOOTH_ALPHA, 0.5);
+    spat_filter.set_option(RS2_OPTION_FILTER_SMOOTH_DELTA, 20);
+    rs2::disparity_transform depth_to_disparity(true);
+    rs2::disparity_transform disparity_to_depth(false);
+
+
     rs2::frame depth = aligned_frame.get_depth_frame();
+    depth = depth_to_disparity.process(depth);
+    //depth = spat_filter.process(depth);
+    depth = disparity_to_depth.process(depth);
     rs2::frame color = aligned_frame.get_color_frame();
 
     cv::Mat imRGB(cv::Size(WIDTH, HEIGHT), CV_8UC3, (void *) color.get_data(), cv::Mat::AUTO_STEP);
     cv::Mat imDep(cv::Size(WIDTH, HEIGHT), CV_16UC1, (void *) depth.get_data(), cv::Mat::AUTO_STEP);
-
+    cv::Mat imCombine(cv::Size(WIDTH, HEIGHT*2), CV_8UC3);
     /* encode depth (Z_16) to CV_8UC3
-     * Decode:
-     * if (imOut(1) >= imOut(0))  dist = imOut(0)*20 + imOut(2)
-     * if (imOut(1) < imOut(0))   dist = imOut(0)*19 + imOut(1)
+     * 0: Z/32
+     * 1: Z/32
+     * 2: Z \in 0-32
      * */
-
     double scale_factor = 0.05;
     std::vector<cv::Mat> Depth_channel(3);
-    imDep.convertTo(Depth_channel[0], CV_16U, scale_factor);
+    imDep.copyTo(Depth_channel[0]);
+    Depth_channel[0].convertTo(Depth_channel[0], CV_16U, 1.0/32.0);
     imDep.copyTo(Depth_channel[1]);
-    Depth_channel[1] = Depth_channel[1] - Depth_channel[0]*(1/scale_factor - 1);
+    Depth_channel[1].convertTo(Depth_channel[1], CV_16U, 1.0/32.0);
     imDep.copyTo(Depth_channel[2]);
-    Depth_channel[2] = Depth_channel[2] - Depth_channel[0]*(1/scale_factor);
+    Depth_channel[2].convertTo(Depth_channel[2], CV_16U, 1.0/32.0);
+    Depth_channel[2].convertTo(Depth_channel[2], CV_16U, 32.0);
+    Depth_channel[2] = imDep - Depth_channel[2];
 
     cv::Mat imD_C3;
-    cv::Mat imCombine(cv::Size(WIDTH, HEIGHT*2), CV_8UC3);
     cv::merge(Depth_channel, imD_C3);
     imD_C3.convertTo(imD_C3, CV_8UC3);
+    cv::cvtColor(imD_C3, imD_C3, CV_BGR2RGB);
 
     cv::vconcat(imRGB,imD_C3,imCombine);
-
-    /*
-    cv::Vec3b mapData = imD_C3.at<cv::Vec3b>(100,100);
-    int dist;
-    if (mapData(1) >= mapData(0) )
-        dist = (int)mapData(0)*20 + (int)mapData(2);
-    if (mapData(1) < mapData(0))
-        dist = (int)mapData(0)*19 + (int)mapData(1);
-
-    std::cout << "16BIT: " << imDep.at<ushort>(100,100)
-              << " Decode: " << dist
-              << " Diff: " << imDep.at<ushort>(100,100) - dist
-              << " " << (cv::Vec3f)mapData
-              << std::endl;
-              */
 
     GstMapInfo mapinfo;
     buffer = gst_buffer_new_allocate (NULL, size, NULL);
@@ -173,7 +172,8 @@ main (int argc, char *argv[])
     factory = gst_rtsp_media_factory_new ();
     gst_rtsp_media_factory_set_launch (factory,
                                        "( appsrc name=mysrc !  videoconvert ! "
-                                       "x264enc pass=qual quantizer=20 tune=zerolatency ! rtph264pay name=pay0 pt=96 )");
+                                       "x264enc " //pass=qual quantizer=20 tune=zerolatency "
+                                       "! rtph264pay name=pay0 pt=96 )");
 
     /* notify when our media is ready, This is called whenever someone asks for
      * the media and a new pipeline with our appsrc is created */

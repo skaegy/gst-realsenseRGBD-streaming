@@ -66,8 +66,9 @@ int main(){
         addr.sin_family = AF_INET;
         addr.sin_port   = htons(port_out);
         //addr.sin_addr.s_addr = htonl(INADDR_ANY);
-        addr.sin_addr.s_addr = inet_addr("146.169.174.207"); // Set
-        std::string send_str = "Hello world " + std::to_string(counter);
+        addr.sin_addr.s_addr = inet_addr("146.169.203.165"); // Set
+        //std::string send_str = "Hello world " + std::to_string(counter);
+        std::string send_str = std::to_string(1);
 
         struct sockaddr_in src;
         socklen_t src_len = sizeof(src);
