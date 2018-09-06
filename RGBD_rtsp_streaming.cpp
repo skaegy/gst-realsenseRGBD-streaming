@@ -165,10 +165,11 @@ main (int argc, char *argv[])
     factory = gst_rtsp_media_factory_new ();
     gst_rtsp_media_factory_set_launch (factory,
                                        "( appsrc name=mysrc ! videoconvert ! "
-                                       "x264enc speed-preset=ultrafast "
+                                       "x264enc "
+                                       //"speed-preset=ultrafast "
                                        "pass=qual quantizer=20 tune=zerolatency "
-                                       "intra-refresh=true vbv-buf-capacity=0 qp-min=18 "
-                                       "byte-stream=true key-int-max=15"
+                                       //"intra-refresh=true vbv-buf-capacity=0 qp-min=18 "
+                                       //"byte-stream=true key-int-max=15"
                                        " ! rtph264pay name=pay0 pt=96 )");
 
     /* notify when our media is ready, This is called whenever someone asks for
