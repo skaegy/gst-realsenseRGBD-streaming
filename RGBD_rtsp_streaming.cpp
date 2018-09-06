@@ -30,8 +30,8 @@
 #include <opencv2/imgproc.hpp>
 #include <iostream>
 
-const int WIDTH = 424;
-const int HEIGHT = 240;
+const int WIDTH = 640;
+const int HEIGHT = 480;
 const int SIZE = WIDTH * HEIGHT * 3;
 const int FRAME = 15;
 rs2::align align(RS2_STREAM_COLOR);
@@ -61,37 +61,30 @@ need_data (GstElement * appsrc, guint unused, gpointer user_data)
     rs2::disparity_transform depth_to_disparity(true);
     rs2::disparity_transform disparity_to_depth(false);
 
-
     rs2::frame depth = aligned_frame.get_depth_frame();
     depth = depth_to_disparity.process(depth);
-    //depth = spat_filter.process(depth);
+    depth = spat_filter.process(depth);
     depth = disparity_to_depth.process(depth);
     rs2::frame color = aligned_frame.get_color_frame();
 
     cv::Mat imRGB(cv::Size(WIDTH, HEIGHT), CV_8UC3, (void *) color.get_data(), cv::Mat::AUTO_STEP);
     cv::Mat imDep(cv::Size(WIDTH, HEIGHT), CV_16UC1, (void *) depth.get_data(), cv::Mat::AUTO_STEP);
+    imDep.setTo(cv::Scalar(0), imDep > 4000);
+    imDep.setTo(cv::Scalar(0), imDep < 300);
     cv::Mat imCombine(cv::Size(WIDTH, HEIGHT*2), CV_8UC3);
     /* encode depth (Z_16) to CV_8UC3
-     * 0: Z/32
-     * 1: Z/32
-     * 2: Z \in 0-32
+     * Valid data belongs to (300mm to 4000mm)
+     * 0: Z/16
+     * 1: Z/16
+     * 2: Z/16
      * */
-    double scale_factor = 0.05;
     std::vector<cv::Mat> Depth_channel(3);
-    imDep.copyTo(Depth_channel[0]);
-    Depth_channel[0].convertTo(Depth_channel[0], CV_16U, 1.0/32.0);
-    imDep.copyTo(Depth_channel[1]);
-    Depth_channel[1].convertTo(Depth_channel[1], CV_16U, 1.0/32.0);
-    imDep.copyTo(Depth_channel[2]);
-    Depth_channel[2].convertTo(Depth_channel[2], CV_16U, 1.0/32.0);
-    Depth_channel[2].convertTo(Depth_channel[2], CV_16U, 32.0);
-    Depth_channel[2] = imDep - Depth_channel[2];
-
+    imDep.convertTo(Depth_channel[0], CV_16U, 1.0/16.0);
+    imDep.convertTo(Depth_channel[1], CV_16U, 1.0/16.0);
+    imDep.convertTo(Depth_channel[2], CV_16U, 1.0/16.0);
     cv::Mat imD_C3;
     cv::merge(Depth_channel, imD_C3);
     imD_C3.convertTo(imD_C3, CV_8UC3);
-    cv::cvtColor(imD_C3, imD_C3, CV_BGR2RGB);
-
     cv::vconcat(imRGB,imD_C3,imCombine);
 
     GstMapInfo mapinfo;
@@ -171,9 +164,12 @@ main (int argc, char *argv[])
      * element with pay%d names will be a stream */
     factory = gst_rtsp_media_factory_new ();
     gst_rtsp_media_factory_set_launch (factory,
-                                       "( appsrc name=mysrc !  videoconvert ! "
-                                       "x264enc " //pass=qual quantizer=20 tune=zerolatency "
-                                       "! rtph264pay name=pay0 pt=96 )");
+                                       "( appsrc name=mysrc ! videoconvert ! "
+                                       "x264enc speed-preset=ultrafast "
+                                       "pass=qual quantizer=20 tune=zerolatency "
+                                       "intra-refresh=true vbv-buf-capacity=0 qp-min=18 "
+                                       "byte-stream=true key-int-max=15"
+                                       " ! rtph264pay name=pay0 pt=96 )");
 
     /* notify when our media is ready, This is called whenever someone asks for
      * the media and a new pipeline with our appsrc is created */
