@@ -73,6 +73,15 @@ target_link_libraries(RGBD_rtsp_streaming
         realsense2
         )
 
+add_executable(RGB_rtsp_streaming RGB_rtsp_streaming.cpp)
+target_link_libraries(RGB_rtsp_streaming
+        ${OpenCV_LIBS}
+        ${realsense2_LIBRARIES}
+        ${GST_LIBRARIES}
+        ${GLIB_LDFLAGS}
+        realsense2
+        )
+
 add_executable(UDPserver UDPserver.cpp)
 target_link_libraries(UDPserver
         ${OpenCV_LIBS})
