@@ -30,10 +30,10 @@
 #include <opencv2/imgproc.hpp>
 #include <iostream>
 
-const int WIDTH = 424;
-const int HEIGHT = 240;
+const int WIDTH = 640;
+const int HEIGHT = 480;
 const int SIZE = WIDTH * HEIGHT * 3;
-const int FRAME = 15;
+const int FRAME = 30;
 rs2::align align(RS2_STREAM_COLOR);
 
 typedef struct
